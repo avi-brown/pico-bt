@@ -1,124 +1,196 @@
 #include <stdio.h>
-#include <unistd.h> /* for sleep */
+#include <unistd.h>
 
 #define PICO_BT_IMPLEMENTATION
 #include "pico_bt.h"
 
-/* --- Context --- */
-
-typedef struct 
+typedef struct
 {
-    int battery;
-    int enemy_visible; 
-} RobotContext;
+    int distance_from_box1;
+    int distance_from_box2;
+    int items_in_bag;
+    int battery_level;
+    char last_action[64];
+} Context;
 
-/* --- Leaf Nodes --- */
-
-/* Condition: Returns SUCCESS if battery is > 30 */
-enum STATUS check_battery_good(struct Node * self, void * arena) 
+const char * status_to_str(enum STATUS s)
 {
-    RobotContext * bot = (RobotContext *)arena;
-    if (bot->battery > 30) return YES;
-    return NO;
+    switch (s)
+    {
+        case FAILURE: return "FAILURE";
+        case SUCCESS: return "SUCCESS";
+        case RUNNING: return "RUNNING";
+        default:      return "UNKNOWN";
+    }
 }
 
-/* Action: Charges battery. Returns RUNNING until 100 */
-enum STATUS action_recharge(struct Node * self, void * arena) 
+void render_tui(int tick, enum STATUS root_status, Context * context)
 {
-    RobotContext * bot = (RobotContext *)arena;
-    printf("[Action] Recharging... (%d%%)\n", bot->battery);
-    bot->battery += 10;
-    if (bot->battery >= 100) 
+    /* clear screen and move cursor home */
+    printf("\033[2J\033[H");
+
+    printf("+----------------------------------------------------------+\n");
+    printf("| Tick: %-4d | Root status: %-8s                   |\n",
+           tick, status_to_str(root_status));
+    printf("+----------------+----------------+------------------------+\n");
+    printf("| Box1 distance  | Box2 distance  | Items in bag           |\n");
+    printf("+----------------+----------------+------------------------+\n");
+    printf("| %14d | %14d | %22d |\n",
+           context->distance_from_box1,
+           context->distance_from_box2,
+           context->items_in_bag);
+    printf("+----------------+-----------------------------------------+\n");
+    printf("| Battery level  | %-39d|\n", context->battery_level);
+    printf("+----------------------------------------------------------+\n");
+    printf("| Last action: %-40s |\n", context->last_action);
+    printf("+----------------------------------------------------------+\n");
+
+    fflush(stdout);
+}
+
+enum STATUS at_box1(struct Node * self, void * context)
+{
+    Context * _context = (Context *)context;
+    if (_context->distance_from_box1 <= 0)
     {
-        bot->battery = 100;
-        printf("[Action] Battery Full.\n");
-        return SUCCESS;
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "at_box1: dist=%d -> YES", _context->distance_from_box1);
+        return YES;
     }
+
+    else
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "at_box1: dist=%d -> NO", _context->distance_from_box1);
+        return NO;
+    }
+}
+
+enum STATUS at_box2(struct Node * self, void * context)
+{
+    Context * _context = (Context *)context;
+    if (_context->distance_from_box2 <= 0)
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "at_box2: dist=%d -> YES", _context->distance_from_box2);
+        return YES;
+    }
+
+    else
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "at_box2: dist=%d -> NO", _context->distance_from_box2);
+        return NO;
+    }
+}
+
+enum STATUS travel_to_box1(struct Node * self, void * context)
+{
+    Context * _context = (Context *)context;
+    _context->distance_from_box1 == 1 ? _context->distance_from_box1 = 0 : _context->distance_from_box1--;
+    snprintf(_context->last_action, sizeof(_context->last_action),
+             "travel_to_box1: dist=%d -> RUNNING", _context->distance_from_box1);
+    _context->battery_level--;
     return RUNNING;
 }
 
-/* Condition: Returns SUCCESS if enemy flag is set */
-enum STATUS check_enemy(struct Node * self, void * arena) 
+enum STATUS travel_to_box2(struct Node * self, void * context)
 {
-    RobotContext * bot = (RobotContext *)arena;
-    if (bot->enemy_visible) return YES;
-    return NO;
+    Context * _context = (Context *)context;
+    _context->distance_from_box2 == 1 ? _context->distance_from_box2 = 0 : _context->distance_from_box2--;
+    snprintf(_context->last_action, sizeof(_context->last_action),
+             "travel_to_box2: dist=%d -> RUNNING", _context->distance_from_box2);
+    _context->battery_level--;
+    return RUNNING;
 }
 
-/* Action: Attacks. Drains battery slightly */
-enum STATUS action_attack(struct Node * self, void * arena) 
+enum STATUS move_item_into_bag(struct Node * self, void * context)
 {
-    RobotContext * bot = (RobotContext *)arena;
-    printf("[Action] ATTACKING ENEMY!\n");
-    bot->battery -= 5; 
+    Context * _context = (Context *)context;
+    _context->items_in_bag++;
+    snprintf(_context->last_action, sizeof(_context->last_action),
+             "move_item_into_bag: items=%d -> SUCCESS", _context->items_in_bag);
+    _context->battery_level--;
     return SUCCESS;
 }
 
-/* Action: Patrols. Drains battery */
-enum STATUS action_patrol(struct Node * self, void * arena) 
+enum STATUS bag_full(struct Node * self, void * context)
 {
-    RobotContext * bot = (RobotContext *)arena;
-    printf("[Action] Patrolling area...\n");
-    bot->battery -= 2; 
-    return SUCCESS;
+    Context * _context = (Context *)context;
+    if (_context->items_in_bag >= 5)
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "bag_full: items=%d -> YES", _context->items_in_bag);
+        return YES;
+    }
+
+    else
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "bag_full: items=%d -> NO", _context->items_in_bag);
+        return NO;
+    }
 }
 
-/* --- Main --- */
-
-int main() 
+enum STATUS battery_empty(struct Node * self, void * context)
 {
-    RobotContext bot = { 100, 0 }; /* Full battery, no enemy */
+    Context * _context = (Context *)context;
+    if (_context->battery_level <= 0)
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "battery_empty: level=%d -> YES", _context->battery_level);
+        return YES;
+    }
 
-    /* 
-       Tree Structure:
-       Root (Selector)
-        |-- SelfPreservation (Sequence)
-        |    |-- Inverter (Not Good Battery?) -> check_battery_good
-        |    |-- action_recharge
-        |
-        |-- Combat (Sequence)
-        |    |-- check_enemy
-        |    |-- action_attack
-        |
-        |-- action_patrol
-    */
+    else
+    {
+        snprintf(_context->last_action, sizeof(_context->last_action),
+                 "battery_empty: level=%d -> NO", _context->battery_level);
+        return NO;
+    }
+}
+
+
+int main()
+{
+    Context context = { 5, 6, 0, 20, "start", };
 
     struct Node * root =
         SELECTOR(
+            LEAF(battery_empty),
 
             SEQUENCE(
-                INVERTER(
-                    LEAF(check_battery_good)
+                SELECTOR(
+                    LEAF(at_box1),
+                    LEAF(travel_to_box1),
                 ),
-                LEAF(action_recharge)
-            ),
+                SELECTOR(
+                    LEAF(bag_full),
+                    REPEATER(LEAF(move_item_into_bag)),
+                ),
+                SELECTOR(
+                    LEAF(at_box2),
+                    LEAF(travel_to_box2),
+                )
 
-            SEQUENCE(
-                LEAF(check_enemy),
-                LEAF(action_attack)
-            ),
-
-            LEAF(action_patrol)
-
+            )
         );
 
-    /* Simulation Loop */
-    printf("Starting Robot Logic...\n");
-
-    for (int i = 0; i < 60; i++) 
+    enum STATUS root_status = RUNNING;
+    int tick = 0;
+    while (1)
     {
-        printf("\nTick %d [Batt: %d | Enemy: %d]: ", i, bot.battery, bot.enemy_visible);
-        
-        /* Simulate random enemy appearance at tick 5, gone at 10 */
-        if (i == 5) bot.enemy_visible = 1;
-        if (i == 10) bot.enemy_visible = 0;
+        root_status = root->behavior(root, &context);
 
-        enum STATUS status = root->tick_cb(root, &bot);
-        
-        /* Speed up drain to test recharge logic sooner */
-        if (bot.battery > 50 && status != RUNNING) bot.battery -= 5; 
+        render_tui(tick, root_status, &context);
 
-        sleep(1); 
+        if (root_status != RUNNING)
+        {
+            break;
+        }
+
+        tick++;
+        sleep(1);
     }
 
     return 0;

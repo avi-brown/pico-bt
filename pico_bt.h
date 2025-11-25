@@ -17,16 +17,16 @@
 #define _NARG_(...) _ARG_N(__VA_ARGS__)
 #define NUM_ARGS(...) _NARG_(__VA_ARGS__, _RSEQ_N())
 
-#define LEAF(_tick_cb)                                  \
+#define LEAF(fn)                                        \
     &((struct Node){                                    \
-        .tick_cb = _tick_cb,                            \
+        .behavior = fn,                                 \
         .n_children = 0,                                \
         .children = 0                                   \
     })
 
-#define COMPOSITE(_tick_cb, ...)                        \
+#define COMPOSITE(fn, ...)                              \
     &((struct Node){                                    \
-        .tick_cb = _tick_cb,                            \
+        .behavior = fn,                                 \
         .n_children = NUM_ARGS(__VA_ARGS__),            \
         .children = (struct Node*[]){ __VA_ARGS__ }     \
     })
@@ -34,42 +34,44 @@
 #define SEQUENCE(...) COMPOSITE(sequence, __VA_ARGS__)
 #define SELECTOR(...) COMPOSITE(selector, __VA_ARGS__)
 #define INVERTER(...) COMPOSITE(inverter, __VA_ARGS__)
+#define REPEATER(...) COMPOSITE(repeater, __VA_ARGS__)
 /* ------------------------ */
 
 enum STATUS 
 {
+    FAILURE,
     SUCCESS,
-    RUNNING,
-    FAILURE
+    RUNNING
 };
 
-#define YES SUCCESS
-#define NO  FAILURE
+#define YES     SUCCESS
+#define NO      FAILURE
 
 struct Node;
 
-typedef enum STATUS (*tick)(struct Node * self, void * arena);
+typedef enum STATUS (*tick_cb)(struct Node * self, void * context);
 
 struct Node 
 {
-    tick tick_cb;
+    tick_cb behavior;
     struct Node ** children;
     int n_children;
 };
 
-enum STATUS sequence(struct Node * self, void * arena);
-enum STATUS selector(struct Node * self, void * arena);
-enum STATUS inverter(struct Node * self, void * arena);
+enum STATUS sequence(struct Node * self, void * context);
+enum STATUS selector(struct Node * self, void * context);
+enum STATUS inverter(struct Node * self, void * context);
+enum STATUS repeater(struct Node * self, void * context);
 
 /* ------------------------ */
 #ifdef PICO_BT_IMPLEMENTATION
 
-enum STATUS sequence(struct Node * self, void * arena) 
+enum STATUS sequence(struct Node * self, void * context) 
 {
     for (int child = 0; child < self->n_children; child++) 
     {
         struct Node * current_child = self->children[child];
-        enum STATUS result = current_child->tick_cb(current_child, arena);
+        enum STATUS result = current_child->behavior(current_child, context);
         if (result != SUCCESS) 
         {
             return result;
@@ -79,12 +81,12 @@ enum STATUS sequence(struct Node * self, void * arena)
     return SUCCESS;
 }
 
-enum STATUS selector(struct Node * self, void * arena) 
+enum STATUS selector(struct Node * self, void * context) 
 {
     for (int child = 0; child < self->n_children; child++) 
     {
         struct Node * current_child = self->children[child];
-        enum STATUS result = current_child->tick_cb(current_child, arena);
+        enum STATUS result = current_child->behavior(current_child, context);
         if (result != FAILURE) 
         {
             return result;
@@ -94,10 +96,10 @@ enum STATUS selector(struct Node * self, void * arena)
     return FAILURE;
 }
 
-enum STATUS inverter(struct Node * self, void * arena) 
+enum STATUS inverter(struct Node * self, void * context) 
 {
     struct Node * child = self->children[0]; /* Inverters have a single child */
-    enum STATUS result = child->tick_cb(child, arena);
+    enum STATUS result = child->behavior(child, context);
     switch (result)
     {
         case SUCCESS:
@@ -112,6 +114,22 @@ enum STATUS inverter(struct Node * self, void * arena)
         default:
             return FAILURE; 
             break;
+    }
+}
+
+enum STATUS repeater(struct Node * self, void * context) 
+{
+    struct Node * child = self->children[0]; /* Repeaters have a single child */
+    enum STATUS result = child->behavior(child, context);
+
+    if (result == SUCCESS)
+    {
+        return RUNNING;
+    }
+
+    else
+    {
+        return result;
     }
 }
 
