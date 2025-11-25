@@ -1,12 +1,50 @@
 #ifndef PICO_BT_H
 #define PICO_BT_H
 
+/* ------------------------ */
+
+#define _ARG_N(                                         \
+ _1, _2, _3, _4, _5, _6, _7, _8, _9,_10,                \
+ _11,_12,_13,_14,_15,_16,_17,_18,_19,_20,               \
+ _21,_22,_23,_24,_25,_26,_27,_28,_29,_30,               \
+ _31,_32,N,...) N
+
+#define _RSEQ_N()                                       \
+ 32,31,30,29,28,27,26,25,24,23,22,21,20,                \
+ 19,18,17,16,15,14,13,12,11,10, 9, 8, 7,                \
+ 6, 5, 4, 3, 2, 1, 0
+
+#define _NARG_(...) _ARG_N(__VA_ARGS__)
+#define NUM_ARGS(...) _NARG_(__VA_ARGS__, _RSEQ_N())
+
+#define LEAF(_tick_cb)                                  \
+    &((struct Node){                                    \
+        .tick_cb = _tick_cb,                            \
+        .n_children = 0,                                \
+        .children = 0                                   \
+    })
+
+#define COMPOSITE(_tick_cb, ...)                        \
+    &((struct Node){                                    \
+        .tick_cb = _tick_cb,                            \
+        .n_children = NUM_ARGS(__VA_ARGS__),            \
+        .children = (struct Node*[]){ __VA_ARGS__ }     \
+    })
+
+#define SEQUENCE(...) COMPOSITE(sequence, __VA_ARGS__)
+#define SELECTOR(...) COMPOSITE(selector, __VA_ARGS__)
+#define INVERTER(...) COMPOSITE(inverter, __VA_ARGS__)
+/* ------------------------ */
+
 enum STATUS 
 {
     SUCCESS,
     RUNNING,
     FAILURE
 };
+
+#define YES SUCCESS
+#define NO  FAILURE
 
 struct Node;
 
@@ -21,6 +59,7 @@ struct Node
 
 enum STATUS sequence(struct Node * self, void * arena);
 enum STATUS selector(struct Node * self, void * arena);
+enum STATUS inverter(struct Node * self, void * arena);
 
 /* ------------------------ */
 #ifdef PICO_BT_IMPLEMENTATION
@@ -53,6 +92,27 @@ enum STATUS selector(struct Node * self, void * arena)
     }
 
     return FAILURE;
+}
+
+enum STATUS inverter(struct Node * self, void * arena) 
+{
+    struct Node * child = self->children[0]; /* Inverters have a single child */
+    enum STATUS result = child->tick_cb(child, arena);
+    switch (result)
+    {
+        case SUCCESS:
+            return FAILURE;
+            break;
+        case FAILURE:
+            return SUCCESS;
+            break;
+        case RUNNING:
+            return RUNNING;
+            break;
+        default:
+            return FAILURE; 
+            break;
+    }
 }
 
 #endif
