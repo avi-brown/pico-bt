@@ -2,6 +2,9 @@
 #define PICO_BT_H
 
 /* ------------------------ */
+#ifndef CONTEXT
+#define CONTEXT void
+#endif
 
 #define _ARG_N(                                         \
  _1, _2, _3, _4, _5, _6, _7, _8, _9,_10,                \
@@ -49,7 +52,7 @@ enum STATUS
 
 struct Node;
 
-typedef enum STATUS (*tick_cb)(struct Node * self, void * context);
+typedef enum STATUS (*tick_cb)(struct Node * self, CONTEXT * context);
 
 struct Node 
 {
@@ -58,15 +61,15 @@ struct Node
     int n_children;
 };
 
-enum STATUS sequence(struct Node * self, void * context);
-enum STATUS selector(struct Node * self, void * context);
-enum STATUS inverter(struct Node * self, void * context);
-enum STATUS repeater(struct Node * self, void * context);
+enum STATUS sequence(struct Node * self, CONTEXT * context);
+enum STATUS selector(struct Node * self, CONTEXT * context);
+enum STATUS inverter(struct Node * self, CONTEXT * context);
+enum STATUS repeater(struct Node * self, CONTEXT * context);
 
 /* ------------------------ */
 #ifdef PICO_BT_IMPLEMENTATION
 
-enum STATUS sequence(struct Node * self, void * context) 
+enum STATUS sequence(struct Node * self, CONTEXT * context) 
 {
     for (int child = 0; child < self->n_children; child++) 
     {
@@ -81,7 +84,7 @@ enum STATUS sequence(struct Node * self, void * context)
     return SUCCESS;
 }
 
-enum STATUS selector(struct Node * self, void * context) 
+enum STATUS selector(struct Node * self, CONTEXT * context) 
 {
     for (int child = 0; child < self->n_children; child++) 
     {
@@ -96,7 +99,7 @@ enum STATUS selector(struct Node * self, void * context)
     return FAILURE;
 }
 
-enum STATUS inverter(struct Node * self, void * context) 
+enum STATUS inverter(struct Node * self, CONTEXT * context) 
 {
     struct Node * child = self->children[0]; /* Inverters have a single child */
     enum STATUS result = child->behavior(child, context);
@@ -104,20 +107,16 @@ enum STATUS inverter(struct Node * self, void * context)
     {
         case SUCCESS:
             return FAILURE;
-            break;
         case FAILURE:
             return SUCCESS;
-            break;
         case RUNNING:
             return RUNNING;
-            break;
         default:
             return FAILURE; 
-            break;
     }
 }
 
-enum STATUS repeater(struct Node * self, void * context) 
+enum STATUS repeater(struct Node * self, CONTEXT * context) 
 {
     struct Node * child = self->children[0]; /* Repeaters have a single child */
     enum STATUS result = child->behavior(child, context);

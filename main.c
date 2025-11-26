@@ -2,7 +2,6 @@
 #include <unistd.h>
 
 #define PICO_BT_IMPLEMENTATION
-#include "pico_bt.h"
 
 typedef struct
 {
@@ -12,6 +11,9 @@ typedef struct
     int battery_level;
     char last_action[64];
 } Context;
+
+#define CONTEXT Context
+#include "pico_bt.h"
 
 const char * status_to_str(enum STATUS s)
 {
@@ -48,104 +50,97 @@ void render_tui(int tick, enum STATUS root_status, Context * context)
     fflush(stdout);
 }
 
-enum STATUS at_box1(struct Node * self, void * context)
+enum STATUS at_box1(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    if (_context->distance_from_box1 <= 0)
+    if (context->distance_from_box1 <= 0)
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "at_box1: dist=%d -> YES", _context->distance_from_box1);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "at_box1: dist=%d -> YES", context->distance_from_box1);
         return YES;
     }
 
     else
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "at_box1: dist=%d -> NO", _context->distance_from_box1);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "at_box1: dist=%d -> NO", context->distance_from_box1);
         return NO;
     }
 }
 
-enum STATUS at_box2(struct Node * self, void * context)
+enum STATUS at_box2(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    if (_context->distance_from_box2 <= 0)
+    if (context->distance_from_box2 <= 0)
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "at_box2: dist=%d -> YES", _context->distance_from_box2);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "at_box2: dist=%d -> YES", context->distance_from_box2);
         return YES;
     }
 
     else
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "at_box2: dist=%d -> NO", _context->distance_from_box2);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "at_box2: dist=%d -> NO", context->distance_from_box2);
         return NO;
     }
 }
 
-enum STATUS travel_to_box1(struct Node * self, void * context)
+enum STATUS travel_to_box1(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    _context->distance_from_box1 == 1 ? _context->distance_from_box1 = 0 : _context->distance_from_box1--;
-    snprintf(_context->last_action, sizeof(_context->last_action),
-             "travel_to_box1: dist=%d -> RUNNING", _context->distance_from_box1);
-    _context->battery_level--;
+    context->distance_from_box1 == 1 ? context->distance_from_box1 = 0 : context->distance_from_box1--;
+    snprintf(context->last_action, sizeof(context->last_action),
+             "travel_to_box1: dist=%d -> RUNNING", context->distance_from_box1);
+    context->battery_level--;
     return RUNNING;
 }
 
-enum STATUS travel_to_box2(struct Node * self, void * context)
+enum STATUS travel_to_box2(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    _context->distance_from_box2 == 1 ? _context->distance_from_box2 = 0 : _context->distance_from_box2--;
-    snprintf(_context->last_action, sizeof(_context->last_action),
-             "travel_to_box2: dist=%d -> RUNNING", _context->distance_from_box2);
-    _context->battery_level--;
+    context->distance_from_box2 == 1 ? context->distance_from_box2 = 0 : context->distance_from_box2--;
+    snprintf(context->last_action, sizeof(context->last_action),
+             "travel_to_box2: dist=%d -> RUNNING", context->distance_from_box2);
+    context->battery_level--;
     return RUNNING;
 }
 
-enum STATUS move_item_into_bag(struct Node * self, void * context)
+enum STATUS move_item_into_bag(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    _context->items_in_bag++;
-    snprintf(_context->last_action, sizeof(_context->last_action),
-             "move_item_into_bag: items=%d -> SUCCESS", _context->items_in_bag);
-    _context->battery_level--;
+    context->items_in_bag++;
+    snprintf(context->last_action, sizeof(context->last_action),
+             "move_item_into_bag: items=%d -> SUCCESS", context->items_in_bag);
+    context->battery_level--;
     return SUCCESS;
 }
 
-enum STATUS bag_full(struct Node * self, void * context)
+enum STATUS bag_full(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    if (_context->items_in_bag >= 5)
+    if (context->items_in_bag >= 5)
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "bag_full: items=%d -> YES", _context->items_in_bag);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "bag_full: items=%d -> YES", context->items_in_bag);
         return YES;
     }
 
     else
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "bag_full: items=%d -> NO", _context->items_in_bag);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "bag_full: items=%d -> NO", context->items_in_bag);
         return NO;
     }
 }
 
-enum STATUS battery_empty(struct Node * self, void * context)
+enum STATUS battery_empty(struct Node * self, Context * context)
 {
-    Context * _context = (Context *)context;
-    if (_context->battery_level <= 0)
+    if (context->battery_level <= 0)
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "battery_empty: level=%d -> YES", _context->battery_level);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "battery_empty: level=%d -> YES", context->battery_level);
         return YES;
     }
 
     else
     {
-        snprintf(_context->last_action, sizeof(_context->last_action),
-                 "battery_empty: level=%d -> NO", _context->battery_level);
+        snprintf(context->last_action, sizeof(context->last_action),
+                 "battery_empty: level=%d -> NO", context->battery_level);
         return NO;
     }
 }
