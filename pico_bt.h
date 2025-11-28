@@ -31,13 +31,15 @@
     &((struct Node){                                    \
         .behavior = fn,                                 \
         .n_children = NUM_ARGS(__VA_ARGS__),            \
-        .children = (struct Node*[]){ __VA_ARGS__ }     \
+        .children = (struct Node*[]){ __VA_ARGS__ },    \
+        .current_child = 0                              \
     })
 
-#define SEQUENCE(...) COMPOSITE(sequence, __VA_ARGS__)
-#define SELECTOR(...) COMPOSITE(selector, __VA_ARGS__)
-#define INVERTER(...) COMPOSITE(inverter, __VA_ARGS__)
-#define REPEATER(...) COMPOSITE(repeater, __VA_ARGS__)
+#define SEQUENCE(...)       COMPOSITE(sequence, __VA_ARGS__)
+#define MEM_SEQUENCE(...)   COMPOSITE(mem_sequence, __VA_ARGS__)
+#define SELECTOR(...)       COMPOSITE(selector, __VA_ARGS__)
+#define INVERTER(...)       COMPOSITE(inverter, __VA_ARGS__)
+#define REPEATER(...)       COMPOSITE(repeater, __VA_ARGS__)
 /* ------------------------ */
 
 enum STATUS 
@@ -59,15 +61,14 @@ struct Node
     tick_cb behavior;
     struct Node ** children;
     int n_children;
+    int current_child;
 };
 
 enum STATUS sequence(struct Node * self, CONTEXT * context);
+enum STATUS mem_sequence(struct Node * self, CONTEXT * context);
 enum STATUS selector(struct Node * self, CONTEXT * context);
 enum STATUS inverter(struct Node * self, CONTEXT * context);
 enum STATUS repeater(struct Node * self, CONTEXT * context);
-
-/* ------------------------ */
-#ifdef PICO_BT_IMPLEMENTATION
 
 enum STATUS sequence(struct Node * self, CONTEXT * context) 
 {
@@ -79,6 +80,27 @@ enum STATUS sequence(struct Node * self, CONTEXT * context)
         {
             return result;
         }
+    }
+
+    return SUCCESS;
+}
+
+enum STATUS mem_sequence(struct Node * self, CONTEXT * context) 
+{
+    for (int child = self->current_child; child < self->n_children; child++) 
+    {
+        struct Node * current_child = self->children[child];
+        enum STATUS result = current_child->behavior(current_child, context);
+        if (result != SUCCESS) 
+        {
+            self->current_child = child;
+            return result;
+        }
+    }
+
+    if (self->current_child == self->n_children - 1)
+    {
+        self->current_child = 0;
     }
 
     return SUCCESS;
@@ -131,8 +153,5 @@ enum STATUS repeater(struct Node * self, CONTEXT * context)
         return result;
     }
 }
-
-#endif
-/* ------------------------ */
 
 #endif
