@@ -75,7 +75,7 @@ void render_world(Context * ctx) {
                 printf("\033[33m ★ \033[0m");
             } else if (ctx->grid[y][x] == 2) {
                 /* Charger */
-                printf("\033[1;32m ⚡ \033[0m");
+                printf("\033[1;32m C \033[0m");
             } else {
                 /* Empty */
                 printf("\033[90m · \033[0m");
@@ -92,9 +92,11 @@ void render_world(Context * ctx) {
     int bars = ctx->battery / 10;
     const char * col = (ctx->battery < 30) ? "\033[31m" : "\033[32m";
     for(int i=0; i<10; i++) printf("%s%s", col, (i<bars)?"#":" ");
-    printf("\033[0m] %3d%%         |\n", ctx->battery);
+    /* Pad so the whole line width matches other boxed lines */
+    printf("\033[0m] %3d%%               |\n", ctx->battery);
 
-    printf(" | TRASH:   \033[33m%2d\033[0m collected                     |\n", ctx->trash_collected);
+    /* Pad TRASH line to same total width as header/status lines */
+    printf(" | TRASH:   \033[33m%2d\033[0m collected                    |\n", ctx->trash_collected);
     printf(" +------------------------------------------+\n");
     printf(" | STATUS: \033[35m%-32s\033[0m |\n", ctx->status_msg);
     printf(" +------------------------------------------+\n");
