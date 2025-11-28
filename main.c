@@ -59,8 +59,17 @@ void render_world(Context * ctx) {
         printf(" | ");
         for(int x=0; x<MAP_W; x++) {
             if (x == ctx->x && y == ctx->y) {
-                /* Draw Robot with current Face */
-                printf("\033[1;36m%s\033[0m", ctx->face); 
+                /* Draw Robot with current Face, cropped to 3 chars to keep cell width consistent */
+                char cell_face[4] = "   ";
+                size_t len = strlen(ctx->face);
+                if (len >= 4 && ctx->face[0] == '[' && ctx->face[len - 1] == ']') {
+                    /* Use inner 3 characters, e.g. [o_o] -> o_o */
+                    memcpy(cell_face, ctx->face + 1, 3);
+                    cell_face[3] = '\0';
+                } else {
+                    snprintf(cell_face, sizeof(cell_face), "%.3s", ctx->face);
+                }
+                printf("\033[1;36m%s\033[0m", cell_face); 
             } else if (ctx->grid[y][x] == 1) {
                 /* Trash */
                 printf("\033[33m ★ \033[0m");
