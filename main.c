@@ -77,6 +77,6 @@ int main() {
         );
 
     while (tree->behavior(tree, &ctx) != FAILURE) {
-        sleep_ms(100);
+        sleep_ms(70);
     }
 }
