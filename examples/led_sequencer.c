@@ -1,4 +1,4 @@
-﻿#include "pico/stdlib.h"
+#include "pico/stdlib.h"
 
 typedef struct {
     int dir;
