@@ -6,10 +6,7 @@ Single-file, zero dependencies, designed for microcontrollers and resource-const
 
 ## Behavior Trees
 
-Behavior trees execute from top to bottom, returning one of three states:
-- `SUCCESS` - Task completed successfully
-- `FAILURE` - Task failed
-- `RUNNING` - Task in progress (continue next tick)
+Behavior trees are a modular alternative to finite state machines. Instead of managing explicit state transitions, you compose simple nodes (each returning `SUCCESS`, `FAILURE`, or `RUNNING`) into a hierarchy that re-evaluates every "tick".
 
 ## Node Types
 
